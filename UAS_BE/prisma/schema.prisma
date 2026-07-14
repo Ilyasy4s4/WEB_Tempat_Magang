@@ -1,0 +1,222 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "mysql"
+  url      = env("DATABASE_URL")
+}
+
+model bidang {
+  id                      String                    @id @db.Char(36)
+  name                    String                    @db.VarChar(100)
+  slug                    String                    @unique(map: "slug") @db.VarChar(100)
+  created_at              DateTime?                 @default(now()) @db.Timestamp(0)
+  updated_at              DateTime?                 @default(now()) @db.Timestamp(0)
+  companies               companies[]
+  recommendation_requests recommendation_requests[]
+}
+
+model companies {
+  id                      String                    @id @db.Char(36)
+  tenant_id               String                    @db.Char(36)
+  bidang_id               String                    @db.Char(36)
+  name                    String                    @db.VarChar(150)
+  slug                    String                    @db.VarChar(150)
+  city                    String                    @db.VarChar(100)
+  address                 String?                   @db.Text
+  work_mode               companies_work_mode
+  kuota                   Int                       @default(0)
+  description             String?                   @db.Text
+  logo                    String?                   @db.VarChar(255)
+  is_active               Boolean?                  @default(true)
+  created_at              DateTime?                 @default(now()) @db.Timestamp(0)
+  updated_at              DateTime?                 @default(now()) @db.Timestamp(0)
+  tenants                 tenants                   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "companies_ibfk_1")
+  bidang                  bidang                    @relation(fields: [bidang_id], references: [id], onUpdate: Restrict, map: "companies_ibfk_2")
+  company_criteria_values company_criteria_values[]
+  recommendation_results  recommendation_results[]
+  reviews                 reviews[]
+
+  @@index([bidang_id], map: "bidang_id")
+  @@index([tenant_id], map: "tenant_id")
+}
+
+model company_criteria_values {
+  id          String    @id @db.Char(36)
+  tenant_id   String    @db.Char(36)
+  company_id  String    @db.Char(36)
+  criteria_id String    @db.Char(36)
+  value       Decimal   @db.Decimal(10, 2)
+  updated_at  DateTime? @default(now()) @db.Timestamp(0)
+  tenants     tenants   @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "company_criteria_values_ibfk_1")
+  companies   companies @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "company_criteria_values_ibfk_2")
+  criteria    criteria  @relation(fields: [criteria_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "company_criteria_values_ibfk_3")
+
+  @@unique([company_id, criteria_id], map: "company_id")
+  @@index([criteria_id], map: "criteria_id")
+  @@index([tenant_id], map: "tenant_id")
+}
+
+model criteria {
+  id                             String                           @id @db.Char(36)
+  tenant_id                      String                           @db.Char(36)
+  code                           String                           @db.VarChar(10)
+  name                           String                           @db.VarChar(100)
+  type                           criteria_type
+  default_weight                 Decimal                          @default(0.00) @db.Decimal(5, 2)
+  source                         criteria_source
+  description                    String?                          @db.Text
+  created_at                     DateTime?                        @default(now()) @db.Timestamp(0)
+  updated_at                     DateTime?                        @default(now()) @db.Timestamp(0)
+  company_criteria_values        company_criteria_values[]
+  tenants                        tenants                          @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "criteria_ibfk_1")
+  recommendation_request_weights recommendation_request_weights[]
+  review_ratings                 review_ratings[]
+
+  @@index([tenant_id], map: "tenant_id")
+}
+
+model recommendation_request_weights {
+  id                        String                  @id @db.Char(36)
+  recommendation_request_id String                  @db.Char(36)
+  criteria_id               String                  @db.Char(36)
+  weight                    Decimal                 @db.Decimal(5, 2)
+  recommendation_requests   recommendation_requests @relation(fields: [recommendation_request_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "recommendation_request_weights_ibfk_1")
+  criteria                  criteria                @relation(fields: [criteria_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "recommendation_request_weights_ibfk_2")
+
+  @@index([criteria_id], map: "criteria_id")
+  @@index([recommendation_request_id], map: "recommendation_request_id")
+}
+
+model recommendation_requests {
+  id                             String                             @id @db.Char(36)
+  tenant_id                      String                             @db.Char(36)
+  user_id                        String                             @db.Char(36)
+  bidang_id                      String?                            @db.Char(36)
+  city                           String?                            @db.VarChar(100)
+  work_mode                      recommendation_requests_work_mode?
+  created_at                     DateTime?                          @default(now()) @db.Timestamp(0)
+  recommendation_request_weights recommendation_request_weights[]
+  tenants                        tenants                            @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "recommendation_requests_ibfk_1")
+  users                          users                              @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "recommendation_requests_ibfk_2")
+  bidang                         bidang?                            @relation(fields: [bidang_id], references: [id], onDelete: Restrict, onUpdate: Restrict, map: "recommendation_requests_ibfk_3")
+  recommendation_results         recommendation_results[]
+
+  @@index([bidang_id], map: "bidang_id")
+  @@index([tenant_id], map: "tenant_id")
+  @@index([user_id], map: "user_id")
+}
+
+model recommendation_results {
+  id                        String                  @id @db.Char(36)
+  recommendation_request_id String                  @db.Char(36)
+  company_id                String                  @db.Char(36)
+  final_score               Decimal                 @db.Decimal(10, 4)
+  rank_position             Int
+  created_at                DateTime?               @default(now()) @db.Timestamp(0)
+  recommendation_requests   recommendation_requests @relation(fields: [recommendation_request_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "recommendation_results_ibfk_1")
+  companies                 companies               @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "recommendation_results_ibfk_2")
+
+  @@index([company_id], map: "company_id")
+  @@index([recommendation_request_id], map: "recommendation_request_id")
+}
+
+model review_ratings {
+  id          String   @id @db.Char(36)
+  review_id   String   @db.Char(36)
+  criteria_id String   @db.Char(36)
+  rating      Int      @db.TinyInt
+  reviews     reviews  @relation(fields: [review_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "review_ratings_ibfk_1")
+  criteria    criteria @relation(fields: [criteria_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "review_ratings_ibfk_2")
+
+  @@unique([review_id, criteria_id], map: "review_id")
+  @@index([criteria_id], map: "criteria_id")
+}
+
+model reviews {
+  id             String           @id @db.Char(36)
+  tenant_id      String           @db.Char(36)
+  user_id        String           @db.Char(36)
+  company_id     String           @db.Char(36)
+  comment        String?          @db.Text
+  created_at     DateTime?        @default(now()) @db.Timestamp(0)
+  updated_at     DateTime?        @default(now()) @db.Timestamp(0)
+  review_ratings review_ratings[]
+  tenants        tenants          @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "reviews_ibfk_1")
+  users          users            @relation(fields: [user_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "reviews_ibfk_2")
+  companies      companies        @relation(fields: [company_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "reviews_ibfk_3")
+
+  @@unique([user_id, company_id], map: "user_id")
+  @@index([company_id], map: "company_id")
+  @@index([tenant_id], map: "tenant_id")
+}
+
+model tenants {
+  id                      String                       @id @db.Char(36)
+  name                    String                       @db.VarChar(150)
+  slug                    String                       @unique(map: "slug") @db.VarChar(150)
+  email                   String?                      @db.VarChar(100)
+  address                 String?                      @db.Text
+  subscription_status     tenants_subscription_status? @default(trial)
+  created_at              DateTime?                    @default(now()) @db.Timestamp(0)
+  updated_at              DateTime?                    @default(now()) @db.Timestamp(0)
+  companies               companies[]
+  company_criteria_values company_criteria_values[]
+  criteria                criteria[]
+  recommendation_requests recommendation_requests[]
+  reviews                 reviews[]
+  users                   users[]
+}
+
+model users {
+  id                      String                    @id @db.Char(36)
+  tenant_id               String?                   @db.Char(36)
+  name                    String                    @db.VarChar(100)
+  email                   String                    @unique(map: "email") @db.VarChar(100)
+  password                String                    @db.VarChar(255)
+  role                    users_role
+  nim                     String?                   @db.VarChar(20)
+  jurusan                 String?                   @db.VarChar(100)
+  created_at              DateTime?                 @default(now()) @db.Timestamp(0)
+  updated_at              DateTime?                 @default(now()) @db.Timestamp(0)
+  recommendation_requests recommendation_requests[]
+  reviews                 reviews[]
+  tenants                 tenants?                  @relation(fields: [tenant_id], references: [id], onDelete: Cascade, onUpdate: Restrict, map: "users_ibfk_1")
+
+  @@index([tenant_id], map: "tenant_id")
+}
+
+enum criteria_type {
+  benefit
+  cost
+}
+
+enum recommendation_requests_work_mode {
+  WFO
+  WFH
+  Hybrid
+}
+
+enum tenants_subscription_status {
+  trial
+  active
+  expired
+}
+
+enum users_role {
+  super_admin
+  admin
+  mahasiswa
+}
+
+enum criteria_source {
+  rating_mahasiswa
+  input_admin
+}
+
+enum companies_work_mode {
+  WFO
+  WFH
+  Hybrid
+}
